@@ -1,4 +1,4 @@
-package rng
+package _range
 
 import (
 	"reflect"

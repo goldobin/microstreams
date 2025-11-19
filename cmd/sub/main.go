@@ -27,53 +27,57 @@ func main() {
 		DB:       0,  // use default DB
 	})
 
-	ws := func(w http.ResponseWriter, r *http.Request) {
+	channelHandler := newChannelHandler(log.Named("channel-handler"), rdb)
+
+	r := mux.NewRouter()
+	r.HandleFunc("/subscription/{channel}", channelHandler)
+
+	if err := http.ListenAndServe(":8080", r); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Error("server stopped unexpectedly", zap.Error(err))
+	}
+}
+
+func newChannelHandler(log *zap.Logger, rdb *redis.Client) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		name, ok := vars["channel"]
 
 		if !ok {
-			w.WriteHeader(400)
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write([]byte("channel is not specified"))
 			return
 		}
 
-		wsLog := log.With(
-			zap.Namespace("subscription"),
-			zap.String("channel", name),
-		)
+		log = log.With(zap.String("channel", name))
 
 		u := websocket.Upgrader{}
 		c, err := u.Upgrade(w, r, nil)
 		if err != nil {
-			w.WriteHeader(500)
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte("WebSocket upgrade failed"))
-			wsLog.Error(
+			log.Error(
 				"failed to upgrade to WebSocket",
 				zap.Error(err),
 			)
 			return
 		}
 
-		ctx := r.Context()
-
-		ps := rdb.Subscribe(ctx, name)
+		s := rdb.Subscribe(r.Context(), name)
 		defer func() {
-			wsLog.Debug("unsubscribing from redis channel")
-			err := ps.Close()
-			if err != nil {
-				wsLog.Error(
-					"failed to unsubscribe from redis channel",
-					zap.Error(err),
-				)
+			log.Debug("Unsubscribing from redis channel")
+			if err := s.Close(); err != nil {
+				log.Error("Failed to unsubscribe from redis channel", zap.Error(err))
 			}
 			log.Debug("successfully unsubscribe from redis channel")
 		}()
 
-		wsLog.Debug("subscribed to redis channel")
+		log.Debug("subscribed to redis channel")
 
 		go func() {
-			consumerLog := wsLog.With(zap.Namespace("redis-consumer"))
-			ch := ps.Channel()
+			consumerLog := log.With(zap.Namespace("redis-consumer"))
+			ch := s.Channel()
 
 			for {
 				msg, ok := <-ch
@@ -94,7 +98,7 @@ func main() {
 			}
 		}()
 
-		consumerLog := wsLog.With(zap.Namespace("ws-consumer"))
+		consumerLog := log.With(zap.Namespace("ws-consumer"))
 		for {
 			_, _, err := c.NextReader()
 			if err != nil {
@@ -108,9 +112,4 @@ func main() {
 			consumerLog.Debug("message is received from websocket, ignoring")
 		}
 	}
-
-	router := mux.NewRouter()
-	router.HandleFunc("/subscription/{channel}", ws)
-
-	panic(http.ListenAndServe("0.0.0.0:8080", router))
 }

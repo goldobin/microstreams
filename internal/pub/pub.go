@@ -15,7 +15,7 @@ type Pub struct {
 	RedisConfig redis.Options
 }
 
-func (p Pub) Publish(idRange rng.Range) func() {
+func (p Pub) Publish(idRange _range.Range) func() {
 	needStop := new(uint32)
 
 	go func() {

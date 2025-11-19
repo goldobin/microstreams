@@ -16,7 +16,7 @@ func main() {
 	var (
 		redisConfig = redis.Options{Addr: "localhost:6379"}
 		p           = pub.Pub{RedisConfig: redisConfig}
-		r           = rng.Range{Left: 0, Right: 140_000}
+		r           = _range.Range{Left: 0, Right: 140_000}
 		ranges      = r.Split(10)
 		stops       = make([]func(), len(ranges))
 	)
