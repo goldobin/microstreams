@@ -3,10 +3,12 @@ package pub
 import (
 	"context"
 	"fmt"
-	"github.com/go-redis/redis/v8"
-	"gitlab.newmotion.com/cpo/incubator/microstreams/internal/rng"
 	"log"
 	"sync/atomic"
+
+	"github.com/go-redis/redis/v8"
+
+	"github.com/goldobin/microstreams/internal/rng"
 )
 
 type Pub struct {
@@ -40,7 +42,6 @@ func (p Pub) Publish(idRange rng.Range) func() {
 
 			counter++
 		}
-
 	}()
 
 	return func() {

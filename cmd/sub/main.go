@@ -1,16 +1,16 @@
 package main
 
 import (
+	"net/http"
+
 	"github.com/go-redis/redis/v8"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
-	"net/http"
 )
 
 func main() {
 	log, err := zap.NewDevelopment()
-
 	if err != nil {
 		panic(err)
 	}
@@ -28,7 +28,6 @@ func main() {
 	})
 
 	ws := func(w http.ResponseWriter, r *http.Request) {
-
 		vars := mux.Vars(r)
 		name, ok := vars["channel"]
 
@@ -45,7 +44,6 @@ func main() {
 
 		u := websocket.Upgrader{}
 		c, err := u.Upgrade(w, r, nil)
-
 		if err != nil {
 			w.WriteHeader(500)
 			_, _ = w.Write([]byte("WebSocket upgrade failed"))
