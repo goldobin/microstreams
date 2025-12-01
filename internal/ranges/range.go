@@ -1,49 +1,50 @@
-package _range
+package ranges
 
 import (
 	"fmt"
 	"math"
-	"math/rand"
+	"math/rand/v2"
 )
 
-type Range struct {
+type IntRange struct {
 	Left  int
 	Right int // exclusive
 }
 
-func (r Range) String() string {
+func (r IntRange) String() string {
 	return fmt.Sprintf("[%d, %d)", r.Left, r.Right)
 }
 
-func (r Range) Validate() error {
+func (r IntRange) Validate() error {
 	if r.Left >= r.Right {
 		return fmt.Errorf("left must be less than right")
 	}
 	return nil
 }
 
-func (r Range) PickRandom() int {
-	return rand.Intn(r.Right-r.Left) + r.Left
+func (r IntRange) Random(src rand.Source) int {
+	rg := rand.New(src)
+	return rg.IntN(r.Right-r.Left) + r.Left
 }
 
-func (r Range) Length() int {
+func (r IntRange) Length() int {
 	return r.Right - r.Left
 }
 
-func (r Range) Split(n int) []Range {
+func (r IntRange) Split(n int) []IntRange {
 	if n <= 0 {
 		return nil
 	}
 
 	if n == 1 {
-		return []Range{r}
+		return []IntRange{r}
 	}
 
 	if n > r.Length() {
 		n = r.Length()
 	}
 
-	result := make([]Range, n)
+	result := make([]IntRange, n)
 	l := int(math.Ceil(float64(r.Length()) / float64(n)))
 
 	for i := 0; i < n; i++ {
@@ -54,7 +55,7 @@ func (r Range) Split(n int) []Range {
 			right = r.Right
 		}
 
-		result[i] = Range{
+		result[i] = IntRange{
 			Left:  left,
 			Right: right,
 		}

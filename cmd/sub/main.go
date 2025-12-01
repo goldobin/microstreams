@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/go-redis/redis/v8"
@@ -10,106 +12,113 @@ import (
 )
 
 func main() {
-	log, err := zap.NewDevelopment()
-	if err != nil {
-		panic(err)
-	}
+	var (
+		log, logSync = newLogger()
+		rdb          = redis.NewClient(&redis.Options{Addr: "localhost:6379"})
+		h            = handler{Log: log.Named("handler"), Redis: rdb}
+		r            = mux.NewRouter()
+	)
+	defer logSync()
 
-	defer func(log *zap.Logger) {
-		if err := log.Sync(); err != nil {
-			panic(err)
-		}
-	}(log)
-
-	rdb := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "", // no password set
-		DB:       0,  // use default DB
-	})
-
-	channelHandler := newChannelHandler(log.Named("channel-handler"), rdb)
-
-	r := mux.NewRouter()
-	r.HandleFunc("/subscription/{channel}", channelHandler)
-
+	r.Handle("/subscription/{channel}", &h)
 	if err := http.ListenAndServe(":8080", r); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Error("server stopped unexpectedly", zap.Error(err))
 	}
 }
 
-func newChannelHandler(log *zap.Logger, rdb *redis.Client) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		name, ok := vars["channel"]
+type message struct {
+	Text string `json:"text"`
+}
 
-		if !ok {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte("channel is not specified"))
-			return
-		}
-
-		log = log.With(zap.String("channel", name))
-
-		u := websocket.Upgrader{}
-		c, err := u.Upgrade(w, r, nil)
-		if err != nil {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte("WebSocket upgrade failed"))
-			log.Error(
-				"failed to upgrade to WebSocket",
-				zap.Error(err),
-			)
-			return
-		}
-
-		s := rdb.Subscribe(r.Context(), name)
-		defer func() {
-			log.Debug("Unsubscribing from redis channel")
-			if err := s.Close(); err != nil {
-				log.Error("Failed to unsubscribe from redis channel", zap.Error(err))
+func newLogger() (*zap.Logger, func()) {
+	var (
+		log     = zap.Must(zap.NewProduction())
+		logSync = func() {
+			if err := log.Sync(); err != nil {
+				fmt.Printf("Failed to logSync logger: %v", err)
 			}
-			log.Debug("successfully unsubscribe from redis channel")
-		}()
-
-		log.Debug("subscribed to redis channel")
-
-		go func() {
-			consumerLog := log.With(zap.Namespace("redis-consumer"))
-			ch := s.Channel()
-
-			for {
-				msg, ok := <-ch
-
-				if !ok {
-					consumerLog.Debug("redis channel is closed")
-					return
-				}
-
-				consumerLog.Debug("message received from redis, sending message to websocket")
-
-				if err = c.WriteJSON(msg); err != nil {
-					consumerLog.Error("failed to write to websocket", zap.Error(err))
-					return
-				}
-
-				consumerLog.Debug("message is sent to WS")
-			}
-		}()
-
-		consumerLog := log.With(zap.Namespace("ws-consumer"))
-		for {
-			_, _, err := c.NextReader()
-			if err != nil {
-				consumerLog.Error(
-					"failed to read from websocket",
-					zap.Error(err),
-				)
-				break
-			}
-
-			consumerLog.Debug("message is received from websocket, ignoring")
 		}
+	)
+
+	return log, logSync
+}
+
+type handler struct {
+	Log   *zap.Logger
+	Redis *redis.Client
+	U     websocket.Upgrader
+}
+
+func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	name, ok := mux.Vars(r)["channel"]
+	if !ok {
+		h.writeText(w, http.StatusBadRequest, "Channel is not specified")
+		return
 	}
+
+	log := h.Log.With(zap.String("channel", name))
+
+	wsConn, err := h.U.Upgrade(w, r, nil)
+	if err != nil {
+		h.writeText(w, http.StatusInternalServerError, "WebSocket upgrade failed")
+		log.Error(
+			"failed to upgrade to WebSocket",
+			zap.Error(err),
+		)
+		return
+	}
+
+	s := h.Redis.Subscribe(r.Context(), name)
+	ms := convert(toMessage, s.Channel())
+	forward(log.With(zap.Namespace("redis-consumer")), wsConn, ms)
+}
+
+func (h *handler) writeText(w http.ResponseWriter, status int, text string) {
+	log := h.Log
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+	written, err := w.Write([]byte(text))
+	if err != nil {
+		log.Error("Failed to write to websocket", zap.Error(err))
+		return
+	}
+
+	if written != len(text) {
+		log.Error(
+			"Failed to write response",
+			zap.Int("actually_written", written),
+			zap.Int("should_be_written", len(text)),
+		)
+	}
+}
+
+func convert(conv func(*message, *redis.Message), src <-chan *redis.Message) <-chan message {
+	out := make(chan message)
+	go func() {
+		defer close(out)
+		for rm := range src {
+			var m message
+			conv(&m, rm)
+			out <- m
+		}
+	}()
+
+	return out
+}
+
+func forward(log *zap.Logger, dst *websocket.Conn, src <-chan message) {
+	for m := range src {
+		log.Debug("message received from redis, sending message to websocket")
+		if err := dst.WriteJSON(m); err != nil {
+			log.Error("Failed to write to WebSocket", zap.Error(err))
+			return
+		}
+
+		log.Debug("message is sent to WebSocket")
+	}
+}
+
+func toMessage(dst *message, src *redis.Message) {
+	dst.Text = src.Payload
 }
