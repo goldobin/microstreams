@@ -10,20 +10,20 @@ import (
 
 func TestRange_Validation(t *testing.T) {
 	tests := []struct {
-		r       IntRange
+		r       Int
 		wantErr bool
 	}{
-		{r: IntRange{0, 1}},
-		{r: IntRange{1, 2}},
-		{r: IntRange{-1, 0}},
-		{r: IntRange{-2, -1}},
-		{r: IntRange{-100, -2}},
-		{r: IntRange{2, 200}},
-		{r: IntRange{0, 0}, wantErr: true},
-		{r: IntRange{1, 1}, wantErr: true},
-		{r: IntRange{-1, -1}, wantErr: true},
-		{r: IntRange{-1, -2}, wantErr: true},
-		{r: IntRange{2, 1}, wantErr: true},
+		{r: Int{0, 1}},
+		{r: Int{1, 2}},
+		{r: Int{-1, 0}},
+		{r: Int{-2, -1}},
+		{r: Int{-100, -2}},
+		{r: Int{2, 200}},
+		{r: Int{0, 0}, wantErr: true},
+		{r: Int{1, 1}, wantErr: true},
+		{r: Int{-1, -1}, wantErr: true},
+		{r: Int{-1, -2}, wantErr: true},
+		{r: Int{2, 1}, wantErr: true},
 	}
 
 	for _, tt := range tests {
@@ -39,66 +39,66 @@ func TestRange_Validation(t *testing.T) {
 
 func TestRange_Split(t *testing.T) {
 	tests := []struct {
-		r    IntRange
+		r    Int
 		n    int
-		want []IntRange
+		want []Int
 	}{
 		{
-			r: IntRange{0, 1},
+			r: Int{0, 1},
 			n: 0,
 		},
 		{
-			r:    IntRange{0, 1},
+			r:    Int{0, 1},
 			n:    1,
-			want: []IntRange{{0, 1}},
+			want: []Int{{0, 1}},
 		},
 		{
-			r:    IntRange{0, 1},
+			r:    Int{0, 1},
 			n:    2,
-			want: []IntRange{{0, 1}},
+			want: []Int{{0, 1}},
 		},
 		{
-			r:    IntRange{0, 2},
+			r:    Int{0, 2},
 			n:    5,
-			want: []IntRange{{0, 1}, {1, 2}},
+			want: []Int{{0, 1}, {1, 2}},
 		},
 		{
-			r:    IntRange{0, 2},
+			r:    Int{0, 2},
 			n:    1,
-			want: []IntRange{{0, 2}},
+			want: []Int{{0, 2}},
 		},
 		{
-			r: IntRange{0, 2},
+			r: Int{0, 2},
 			n: 2,
-			want: []IntRange{
+			want: []Int{
 				{0, 1}, {1, 2},
 			},
 		},
 		{
-			r: IntRange{0, 3},
+			r: Int{0, 3},
 			n: 2,
-			want: []IntRange{
+			want: []Int{
 				{0, 2}, {2, 3},
 			},
 		},
 		{
-			r: IntRange{0, 4},
+			r: Int{0, 4},
 			n: 2,
-			want: []IntRange{
+			want: []Int{
 				{0, 2}, {2, 4},
 			},
 		},
 		{
-			r: IntRange{0, 5},
+			r: Int{0, 5},
 			n: 2,
-			want: []IntRange{
+			want: []Int{
 				{0, 3}, {3, 5},
 			},
 		},
 		{
-			r: IntRange{0, 5},
+			r: Int{0, 5},
 			n: 3,
-			want: []IntRange{
+			want: []Int{
 				{0, 2}, {2, 4}, {4, 5},
 			},
 		},
@@ -122,7 +122,7 @@ func TestRange_Split(t *testing.T) {
 func TestRange_PickRandom(t *testing.T) {
 	var (
 		n = 100
-		r = IntRange{0, 5}
+		r = Int{0, 5}
 	)
 
 	randSrc := rand.NewPCG(1, 2)

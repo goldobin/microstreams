@@ -7,12 +7,12 @@ import (
 )
 
 type Rate struct {
-	count    int64
-	duration time.Duration
+	Count    int64
+	Duration time.Duration
 }
 
 func (r Rate) IsZero() bool {
-	return r.count == 0 || r.duration == 0
+	return r.Count == 0 || r.Duration == 0
 }
 
 func (r Rate) String() string {
@@ -20,7 +20,7 @@ func (r Rate) String() string {
 		return "0.00 msg/s"
 	}
 
-	perSec := float64(r.count) / r.duration.Seconds()
+	perSec := float64(r.Count) / r.Duration.Seconds()
 	if perSec >= 1 {
 		return fmt.Sprintf("%.2f msg/s", perSec)
 	}
@@ -40,18 +40,8 @@ func (r Rate) String() string {
 	return fmt.Sprintf("%.2f msg/day", perDay)
 }
 
-func New(count int64, duration time.Duration) Rate {
-	if count < 0 {
-		panic("count must be >= 0")
-	}
-	if duration < 0 {
-		panic("duration must be >= 0")
-	}
-	return Rate{count: count, duration: duration}
-}
-
 func (r Rate) Interval() time.Duration {
-	return time.Duration(float64(r.duration) / float64(r.count))
+	return time.Duration(float64(r.Duration) / float64(r.Count))
 }
 
 func (r Rate) Random(source rand.Source) time.Duration {

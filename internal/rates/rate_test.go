@@ -18,56 +18,56 @@ func TestNew(t *testing.T) {
 			name:     "case 1",
 			count:    100,
 			duration: time.Second,
-			wantRate: Rate{count: 100, duration: time.Second},
+			wantRate: Rate{Count: 100, Duration: time.Second},
 		},
 		{
 			name:     "case 2",
 			count:    0,
 			duration: time.Second,
-			wantRate: Rate{count: 0, duration: time.Second},
+			wantRate: Rate{Count: 0, Duration: time.Second},
 		},
 		{
 			name:     "case 3",
 			count:    1,
 			duration: 0,
-			wantRate: Rate{count: 1, duration: 0},
+			wantRate: Rate{Count: 1, Duration: 0},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := New(tt.count, tt.duration)
+			got := Rate{tt.count, tt.duration}
 			assert.Equal(t, tt.wantRate, got)
 		})
 	}
 }
 
-func TestNew_Panics(t *testing.T) {
-	tests := []struct {
-		name     string
-		count    int64
-		duration time.Duration
-	}{
-		{
-			name:     "case 1",
-			count:    -1,
-			duration: time.Second,
-		},
-		{
-			name:     "case 2",
-			count:    100,
-			duration: -time.Second,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Panics(t, func() {
-				New(tt.count, tt.duration)
-			})
-		})
-	}
-}
+//func TestNew_Panics(t *testing.T) {
+//	tests := []struct {
+//		name     string
+//		count    int64
+//		duration time.Duration
+//	}{
+//		{
+//			name:     "case 1",
+//			count:    -1,
+//			duration: time.Second,
+//		},
+//		{
+//			name:     "case 2",
+//			count:    100,
+//			duration: -time.Second,
+//		},
+//	}
+//
+//	for _, tt := range tests {
+//		t.Run(tt.name, func(t *testing.T) {
+//			assert.Panics(t, func() {
+//				Rate{tt.count, tt.duration}
+//			})
+//		})
+//	}
+//}
 
 func TestRate_IsZero(t *testing.T) {
 	tests := []struct {
@@ -77,22 +77,22 @@ func TestRate_IsZero(t *testing.T) {
 	}{
 		{
 			name: "case 1",
-			rate: New(0, time.Second),
+			rate: Rate{0, time.Second},
 			want: true,
 		},
 		{
 			name: "case 2",
-			rate: New(100, 0),
+			rate: Rate{100, 0},
 			want: true,
 		},
 		{
 			name: "case 3",
-			rate: New(0, 0),
+			rate: Rate{0, 0},
 			want: true,
 		},
 		{
 			name: "case 4",
-			rate: New(100, time.Second),
+			rate: Rate{100, time.Second},
 			want: false,
 		},
 	}
@@ -113,52 +113,52 @@ func TestRate_String(t *testing.T) {
 	}{
 		{
 			name: "case 01",
-			rate: New(0, time.Second),
+			rate: Rate{0, time.Second},
 			want: "0.00 msg/s",
 		},
 		{
 			name: "case 02",
-			rate: New(100, 0),
+			rate: Rate{100, 0},
 			want: "0.00 msg/s",
 		},
 		{
 			name: "case 03",
-			rate: New(100, time.Second),
+			rate: Rate{100, time.Second},
 			want: "100.00 msg/s",
 		},
 		{
 			name: "case 04",
-			rate: New(1, 2*time.Second),
+			rate: Rate{1, 2 * time.Second},
 			want: "30.00 msg/min",
 		},
 		{
 			name: "case 05",
-			rate: New(30, time.Minute),
+			rate: Rate{30, time.Minute},
 			want: "30.00 msg/min",
 		},
 		{
 			name: "case 06",
-			rate: New(1, 2*time.Minute),
+			rate: Rate{1, 2 * time.Minute},
 			want: "30.00 msg/h",
 		},
 		{
 			name: "case 07",
-			rate: New(1, 10*time.Minute),
+			rate: Rate{1, 10 * time.Minute},
 			want: "6.00 msg/h",
 		},
 		{
 			name: "case 08",
-			rate: New(1, 2*time.Hour),
+			rate: Rate{1, 2 * time.Hour},
 			want: "12.00 msg/day",
 		},
 		{
 			name: "case 09",
-			rate: New(1, 10*time.Hour),
+			rate: Rate{1, 10 * time.Hour},
 			want: "2.40 msg/day",
 		},
 		{
 			name: "case 10",
-			rate: New(1, 48*time.Hour),
+			rate: Rate{1, 48 * time.Hour},
 			want: "0.50 msg/day",
 		},
 	}
@@ -179,22 +179,22 @@ func TestRate_Interval(t *testing.T) {
 	}{
 		{
 			name: "case 1",
-			rate: New(100, time.Second),
+			rate: Rate{100, time.Second},
 			want: 10 * time.Millisecond,
 		},
 		{
 			name: "case 2",
-			rate: New(1, time.Second),
+			rate: Rate{1, time.Second},
 			want: time.Second,
 		},
 		{
 			name: "case 3",
-			rate: New(2, time.Second),
+			rate: Rate{2, time.Second},
 			want: 500 * time.Millisecond,
 		},
 		{
 			name: "case 4",
-			rate: New(60, time.Minute),
+			rate: Rate{60, time.Minute},
 			want: time.Second,
 		},
 	}

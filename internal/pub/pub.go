@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 
 	"github.com/goldobin/microstreams/internal/rates"
 
@@ -16,49 +16,64 @@ import (
 )
 
 type Pub struct {
-	Rand  *rand.Rand
-	Rate  rates.Rate
-	Redis *redis.Client
-	Log   *zap.Logger
+	Logger zerolog.Logger
+	Redis  *redis.Client
+	Rand   *rand.Rand
+	Rate   rates.Rate
 }
 
-func (p Pub) Publish(ctx context.Context, r ranges.IntRange, rt rates.Rate) {
-	time.Sleep(rt.Random(p.Rand))
+type contextKey struct{}
+
+var shardContextKey contextKey
+
+func (p Pub) Publish(ctx context.Context, shard ranges.Int) {
+	ctx = context.WithValue(ctx, shardContextKey, shard)
+	time.Sleep(p.Rate.Random(p.Rand))
 	var (
-		counter = 0
-		log     = p.Log.With(zap.String("range", r.String()))
-		ticker  = time.NewTicker(rt.Interval())
+		counter    = 0
+		logger     = p.Logger.With().Ctx(ctx).Logger()
+		ticker     = time.NewTicker(p.Rate.Interval())
+		stopReason = "undefined"
 	)
 	defer ticker.Stop()
-	log.Info("Starting publish...")
-	defer log.Info("Publish stopped")
+
+	logger.Info().Msg("Start publishing...")
+	defer func() {
+		logger.Info().Str("stop_reason", stopReason).Msg("Publishing stopped")
+	}()
 
 	for {
 		counter++
 		select {
 		case <-ctx.Done():
-			log.Debug("Stopped", zap.String("stop_reason", ctx.Err().Error()))
+			stopReason = ctx.Err().Error()
 			return
 		case _, ok := <-ticker.C:
 			if !ok {
-				log.Debug("Stopped", zap.String("stop_reason", "ticker stopped"))
+				stopReason = "ticker stopped"
 				return
 			}
 
 			var (
-				id         = r.Random(p.Rand)
-				channelID  = fmt.Sprintf("ch%06d", id)
-				messageID  = fmt.Sprintf("%07d", counter)
-				messageLog = log.With(zap.String("channel_id", channelID), zap.String("message_id", messageID))
-				message    = fmt.Sprintf("Message %s from %s", messageID, r)
-				result     = p.Redis.Publish(ctx, channelID, message)
+				id        = shard.Random(p.Rand)
+				channelID = fmt.Sprintf("ch%06d", id)
+				messageID = fmt.Sprintf("%07d", counter)
+				msgLogger = logger.
+						With().
+						Str("channel_id", channelID).
+						Str("message_id", messageID).
+						Logger()
+				msg    = fmt.Sprintf("Message %s from %s", messageID, shard)
+				result = p.Redis.Publish(ctx, channelID, msg)
 			)
 			if err := result.Err(); err != nil {
 				if errors.Is(err, context.Canceled) {
 					return
 				}
-
-				messageLog.Error("Failed to publish message", zap.Error(result.Err()))
+				msgLogger.
+					Error().
+					Err(result.Err()).
+					Msg("Failed to publish message")
 				continue
 			}
 
@@ -67,11 +82,14 @@ func (p Pub) Publish(ctx context.Context, r ranges.IntRange, rt rates.Rate) {
 				if errors.Is(err, context.Canceled) {
 					return
 				}
-				messageLog.Error("Failed to get the amount of subscribers from publish result", zap.Error(err))
+				msgLogger.
+					Error().
+					Err(err).
+					Msg("Failed to get the amount of subscribers from publish result")
 				continue
 			}
 
-			messageLog.Info(fmt.Sprintf("Message is published to %d clients", subscribersCount))
+			msgLogger.Info().Int64("subscriber_count", subscribersCount).Msg("Message published")
 		}
 	}
 }

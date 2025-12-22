@@ -6,45 +6,45 @@ import (
 	"math/rand/v2"
 )
 
-type IntRange struct {
+type Int struct {
 	Left  int
 	Right int // exclusive
 }
 
-func (r IntRange) String() string {
+func (r Int) String() string {
 	return fmt.Sprintf("[%d, %d)", r.Left, r.Right)
 }
 
-func (r IntRange) Validate() error {
+func (r Int) Validate() error {
 	if r.Left >= r.Right {
 		return fmt.Errorf("left must be less than right")
 	}
 	return nil
 }
 
-func (r IntRange) Random(src rand.Source) int {
+func (r Int) Random(src rand.Source) int {
 	rg := rand.New(src)
 	return rg.IntN(r.Right-r.Left) + r.Left
 }
 
-func (r IntRange) Length() int {
+func (r Int) Length() int {
 	return r.Right - r.Left
 }
 
-func (r IntRange) Split(n int) []IntRange {
+func (r Int) Split(n int) []Int {
 	if n <= 0 {
 		return nil
 	}
 
 	if n == 1 {
-		return []IntRange{r}
+		return []Int{r}
 	}
 
 	if n > r.Length() {
 		n = r.Length()
 	}
 
-	result := make([]IntRange, n)
+	result := make([]Int, n)
 	l := int(math.Ceil(float64(r.Length()) / float64(n)))
 
 	for i := 0; i < n; i++ {
@@ -55,7 +55,7 @@ func (r IntRange) Split(n int) []IntRange {
 			right = r.Right
 		}
 
-		result[i] = IntRange{
+		result[i] = Int{
 			Left:  left,
 			Right: right,
 		}
