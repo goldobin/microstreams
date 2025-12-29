@@ -10,10 +10,9 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/rs/zerolog"
 
-	"github.com/goldobin/microstreams/internal/rates"
-
 	"github.com/goldobin/microstreams/internal/pub"
 	"github.com/goldobin/microstreams/internal/ranges"
+	"github.com/goldobin/microstreams/internal/rate"
 )
 
 func main() {
@@ -34,25 +33,22 @@ func main() {
 	logger.Print("Redis ping OK")
 
 	const (
-		randSeed1            = 1
-		randSeed2            = 2
-		channelCount         = 20
-		publisherCount       = 10
-		durationSeconds      = 10
-		messageRatePerSecond = 10
+		randSeed1       = 1
+		randSeed2       = 2
+		channelCount    = 20
+		publisherCount  = 10
+		durationSeconds = 10
+		msgRate         = 10 * rate.PerSecond
 	)
 	var (
-		randSrc                 = rand.NewPCG(randSeed1, randSeed2)
-		randGen                 = rand.New(randSrc)
-		messageRatePerPublisher = rates.Rate{
-			Count:    messageRatePerSecond * 60 * 60 / publisherCount,
-			Duration: time.Hour,
-		}
-		p = pub.Pub{
+		randSrc             = rand.NewPCG(randSeed1, randSeed2)
+		randGen             = rand.New(randSrc)
+		msgRatePerPublisher = msgRate / publisherCount
+		p                   = pub.Pub{
 			Rand:   randGen,
 			Redis:  redisClient,
 			Logger: logger.With().Str("component", "publisher").Logger(),
-			Rate:   messageRatePerPublisher,
+			Rate:   msgRatePerPublisher,
 		}
 		channelRange   = ranges.Int{Left: 0, Right: channelCount}
 		channelShards  = channelRange.Split(publisherCount)

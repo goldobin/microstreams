@@ -10,16 +10,15 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/rs/zerolog"
 
-	"github.com/goldobin/microstreams/internal/rates"
-
 	"github.com/goldobin/microstreams/internal/ranges"
+	"github.com/goldobin/microstreams/internal/rate"
 )
 
 type Pub struct {
 	Logger zerolog.Logger
 	Redis  *redis.Client
 	Rand   *rand.Rand
-	Rate   rates.Rate
+	Rate   rate.Rate
 }
 
 type contextKey struct{}
